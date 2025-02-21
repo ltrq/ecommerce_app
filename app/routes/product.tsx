@@ -10,22 +10,27 @@ interface Product {
   image: string;
 }
 
-export async function clientLoader({ params }: Route.LoaderArgs) {
+const API_URL = process.env.BASEROW_API_URL;
+const API_TOKEN = process.env.BASEROW_API_TOKEN;
+
+export async function loader({ params }: { params: { id: string } }) {
   const productId = params.id;
-  const response = await fetch(
-    'https://api.baserow.io/api/database/rows/table/434214/?user_field_names=true',
-    {
-      method: 'GET',
-      headers: {
-        Authorization: `Token wnQ8NonCztQMMH6Dk3BxBUiyDe2jf1Dt`,
-      },
-    }
-  );
+
+  if (!API_URL || !API_TOKEN) {
+    throw new Response('API config missing', { status: 500 });
+  }
+
+  const response = await fetch(API_URL, {
+    method: 'GET',
+    headers: {
+      Authorization: `Token ${API_TOKEN}`,
+    },
+  });
 
   const data = await response.json();
 
   if (!data.results || data.results.length === 0) {
-    return { productId: 'no item available' };
+    return { productId: 'No item available' };
   }
 
   const foundProduct = data.results.find((product: Product) => {
@@ -33,24 +38,31 @@ export async function clientLoader({ params }: Route.LoaderArgs) {
       const normalizedProductName = product.itemName
         .toLowerCase()
         .replace(/\s+/g, '-');
-      const normalizedId = productId?.toLowerCase();
-      return normalizedProductName === normalizedId;
+      return normalizedProductName === productId?.toLowerCase();
     }
     return false;
   });
 
   return {
-    productId: foundProduct
-      ? `Product "${foundProduct.itemName}" found in the database`
-      : `Item "${productId}" not found`,
+    productId: foundProduct ? `${foundProduct.itemName}` : `Item not found`,
   };
 }
 
-export default function ProductView({ loaderData }: Route.ComponentProps) {
+export function meta({ data }: { data?: { productId?: string } }) {
+  return [
+    { title: data?.productId || 'E-commerce Shop' },
+    { name: 'description', content: 'Welcome to Your E-commerce Shop' },
+  ];
+}
+
+export default function ProductView({
+  loaderData,
+}: {
+  loaderData: { productId: string };
+}) {
   return (
     <div className="flex flex-col items-center justify-center h-[100dvh] bg-background text-center">
       <div className="flex flex-col items-center gap-4 text-6xl">
-        <br></br>
         <div>{loaderData.productId}</div>
       </div>
     </div>

@@ -11,6 +11,9 @@ import {
 } from '../../@/components/ui/card';
 import { Label } from '../../@/components/ui/label';
 
+import dotenv from 'dotenv';
+import { env } from 'process';
+
 export function meta({}: Route.MetaArgs) {
   return [
     { title: 'Testing' },
@@ -18,10 +21,14 @@ export function meta({}: Route.MetaArgs) {
   ];
 }
 export default function Test() {
+  // dotenv.config();
+  // console.log(env.REACT_APP_BASEROW_API_URL);
+  // console.log(env.REACT_APP_BASEROW_API_TOKEN);
+
   return (
     <>
       {/* <UnderConstruction pagename="Test" /> */}
-      <Label htmlFor="email">Your email address</Label>
+      {/* <Label htmlFor="email">Your email address</Label>
       <Card>
         <CardHeader>
           <CardTitle>Card Title</CardTitle>
@@ -33,7 +40,9 @@ export default function Test() {
         <CardFooter>
           <p>Card Footer</p>
         </CardFooter>
-      </Card>
+      </Card> */}
+      {/* {import.meta.env.REACT_APP_BASEROW_API_URL}
+      {import.meta.env.REACT_APP_BASEROW_API_TOKEN} */}
     </>
   );
 }

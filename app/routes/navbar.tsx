@@ -7,7 +7,7 @@ export default function navbar() {
     <>
       <div className="navbar">
         <div className="navbar__logo">
-          <EcommerceLogo size={32} color={'black'} />
+          <EcommerceLogo size={60} color={'black'} />
         </div>
         <div className="navbar__links">
           <NavLink
