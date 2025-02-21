@@ -1,0 +1,44 @@
+.navbar {
+  display            : flex;
+  align-items        : center;
+  width              : 100%;
+  /* Ensures full width */
+  height             : auto;
+  /* Adapts to content */
+  background-color   : white;
+  color              : black;
+  padding            : 0.25% 5% 0.25% 2.5%;
+  box-sizing         : border-box;
+  /* Prevents padding from affecting width */
+  /* position        : fixed; */
+}
+
+.navbar__logo {
+  flex: 1;
+  /* Takes up 50% */
+}
+
+.navbar__links {
+  flex           : 1;
+  /* Takes up 50% */
+  display        : flex;
+  justify-content: flex-end;
+  /* Push links to the right */
+  gap            : 5%;
+  /* Relative spacing */
+  align-items    : center;
+}
+
+.btn {
+  background-color: black;
+  color           : white;
+  padding         : 10px 20px;
+  border-radius   : 5px;
+  cursor          : pointer;
+  transition      : background-color 0.3s ease;
+  text-align      : center;
+}
+
+.btn:hover {
+  background-color: gray;
+}
