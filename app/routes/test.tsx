@@ -1,5 +1,5 @@
 import UnderConstruction from './UnderConstruction.jsx';
-import type { Route } from './+types/home';
+// import type { Route } from './+types/home';
 
 import {
   Card,
@@ -14,12 +14,12 @@ import { Label } from '../../@/components/ui/label';
 import dotenv from 'dotenv';
 import { env } from 'process';
 
-export function meta({}: Route.MetaArgs) {
-  return [
-    { title: 'Testing' },
-    { name: 'description', content: 'Welcome to Your E-commerce Shop' },
-  ];
-}
+// export function meta({}: Route.MetaArgs) {
+//   return [
+//     { title: 'Testing' },
+//     { name: 'description', content: 'Welcome to Your E-commerce Shop' },
+//   ];
+// }
 export default function Test() {
   // dotenv.config();
   // console.log(env.REACT_APP_BASEROW_API_URL);

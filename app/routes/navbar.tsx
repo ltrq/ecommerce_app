@@ -1,13 +1,21 @@
 import { Link, NavLink, Outlet } from 'react-router';
+import { useUser } from '../context/userContext';
 import '../styles/navbar.css';
 import EcommerceLogo from './EcommerceLogo';
+import Logout from './log-out';
 
-export default function navbar() {
+export default function Navbar() {
+  const { user, loading } = useUser();
+
+  if (loading) {
+    return <div>Loading...</div>;
+  }
+
   return (
     <>
       <div className="navbar">
         <div className="navbar__logo">
-          <EcommerceLogo size={60} color={'black'} />
+          <EcommerceLogo size={60} color="black" />
         </div>
         <div className="navbar__links">
           <NavLink
@@ -46,10 +54,14 @@ export default function navbar() {
           >
             Packages
           </NavLink>
-          <Link to="/sign-in">Sign in</Link>
-          <div className="btn btn--primary">
-            <Link to="/sign-up">Sign up</Link>
-          </div>
+          {user ? <Logout /> : <Link to="/sign-in">Sign in</Link>}
+          {user ? (
+            <div>{user.email}</div>
+          ) : (
+            <div className="btn btn--primary">
+              <Link to="/sign-up">Sign up</Link>
+            </div>
+          )}
         </div>
       </div>
       <Outlet />

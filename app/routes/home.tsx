@@ -1,14 +1,3 @@
-// import type { Route } from './+types/home';
-// import { Welcome } from '../welcome/welcome';
-// import {
-//   Card,
-//   CardContent,
-//   CardDescription,
-//   CardFooter,
-//   CardHeader,
-//   CardTitle,
-// } from '../../@/components/ui/card';
-
 import type { Route } from './+types/home';
 import HomePage from './HomePage';
 

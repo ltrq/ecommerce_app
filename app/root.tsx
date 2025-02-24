@@ -10,7 +10,7 @@ import {
 import React from 'react';
 
 import type { Route } from './+types/root';
-// import NavBar from './routes/navbar';
+import { UserProvider } from './context/userContext';
 
 import './app.css';
 
@@ -46,10 +46,13 @@ export function Layout({ children }: { children: React.ReactNode }) {
 }
 
 export default function App() {
+  console.log('Hydration check:', typeof document !== 'undefined');
+
   return (
     <>
-      {/* <NavBar /> */}
-      <Outlet />
+      <UserProvider>
+        <Outlet />
+      </UserProvider>
     </>
   );
 }
