@@ -16,5 +16,7 @@ export async function fetchAllProducts() {
     throw new Response('Failed to fetch products', { status: response.status });
   }
 
-  return await response.json();
+  const data = await response.json();
+  // Ensure data.results exists, default to empty array if undefined
+  return { results: data.results || [] };
 }

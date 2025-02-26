@@ -1,5 +1,6 @@
 import { logout } from '../services/auth';
 import { useNavigate } from 'react-router';
+import { UserRound } from 'lucide-react';
 
 export default function LogoutButton() {
   const navigate = useNavigate();
@@ -17,5 +18,9 @@ export default function LogoutButton() {
     }
   };
 
-  return <button onClick={handleLogout}>Logout</button>;
+  return (
+    <button onClick={handleLogout}>
+      <UserRound color="black" />
+    </button>
+  );
 }

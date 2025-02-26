@@ -1,3 +1,4 @@
+// app/root.tsx
 import {
   isRouteErrorResponse,
   Links,
@@ -6,11 +7,10 @@ import {
   Scripts,
   ScrollRestoration,
 } from 'react-router';
-
 import React from 'react';
-
 import type { Route } from './+types/root';
 import { UserProvider } from './context/userContext';
+import Chatbox from './routes/chatbox'; // Update path as needed
 
 import './app.css';
 
@@ -49,11 +49,10 @@ export default function App() {
   console.log('Hydration check:', typeof document !== 'undefined');
 
   return (
-    <>
-      <UserProvider>
-        <Outlet />
-      </UserProvider>
-    </>
+    <UserProvider>
+      <Outlet />
+      <Chatbox /> {/* Add chatbox here */}
+    </UserProvider>
   );
 }
 
