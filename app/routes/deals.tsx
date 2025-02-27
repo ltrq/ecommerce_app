@@ -1,5 +1,5 @@
 import type { Route } from './+types/home';
-import UnderConstruction from './UnderConstruction.jsx';
+import UnderConstruction from '../components/UnderConstruction.js';
 
 export function meta({}: Route.MetaArgs) {
   return [

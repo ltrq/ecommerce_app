@@ -1,4 +1,4 @@
-import UnderConstruction from './UnderConstruction.jsx';
+import UnderConstruction from '../components/UnderConstruction.js';
 
 export default function HomePage() {
   return (

@@ -1,6 +1,6 @@
-// app/components/Chatbox.tsx
+// app/components/Chatbox.tsx (partial, focusing on messages state)
 import { useState, useRef, useEffect } from 'react';
-import { fetchAllProducts } from '../utils/baserow'; // Adjust the import path if needed
+import { fetchAllProducts } from '../utils/firebase-utilsFunc'; // Adjust the import path if needed (should point to Firestore)
 import {
   LTRQ_AIBotProductRecommendationPrompt,
   LTRQ_AIBotCartRecoveryPrompt,
@@ -8,48 +8,140 @@ import {
   LTRQ_AIBotLeadGenPrompt,
   LTRQ_AIBotOrderSupportPrompt,
 } from '../utils/AIchatbot-prompts'; // Adjust the import path if needed
+import { auth } from '../utils/firebase'; // Adjust the import path
 
 export default function Chatbox() {
   const [isExpanded, setIsExpanded] = useState(false);
   const [showPopup, setShowPopup] = useState(true); // State for pop-up visibility
   const [messages, setMessages] = useState<
-    { text: string; isUser: boolean; timestamp: Date }[]
+    { text: string; isUser: boolean; timestamp: Date; date?: Date }[] // Added date as optional
   >([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // State for Baserow products
+  // State for Firestore products with updated structure
   const [products, setProducts] = useState<any[]>([]);
   const [isProductsLoading, setIsProductsLoading] = useState(true);
 
-  // Fetch Baserow products
+  // Define product interface based on Firestore structure
+  interface Product {
+    imgURL1?: string;
+    imgURL2?: string;
+    imgURL3?: string;
+    itemName: string;
+    stockQuantity: number;
+    price: number;
+    averageRating: string | number;
+    material: string;
+    itemID: number;
+    subCategoryID: string;
+    color: string;
+    saleStartDate?: any;
+    updatedAt?: any;
+    dimension: string;
+    status: string;
+    reviewCount: string | number;
+    saleEndDate?: any;
+    createdAt?: any;
+    discount: number;
+    categoryID: string;
+    isOnSale: boolean;
+    itemSize: string;
+    description: string;
+    SKU: string;
+  }
+
+  // Keyword arrays for each prompt type
+  const orderKeywords = ['order', 'status', 'track', 'shipment'];
+  const cartKeywords = ['cart', 'abandon', 'buy', 'purchase'];
+  const supportKeywords = ['help', 'support', 'return', 'returns'];
+  const recommendationKeywords = ['recommend', 'looking', 'need', 'want'];
+  const leadKeywords = ['name', 'email', 'lead', 'contact'];
+
+  // Separate function to validate products
+  function validateProducts(productsData: any[]): Product[] {
+    const validatedProducts = productsData
+      .map((product: any) => {
+        if (
+          !product.itemName ||
+          !product.price ||
+          !product.color ||
+          !product.itemSize
+        ) {
+          return null;
+        }
+        return product as Product;
+      })
+      .filter((product): product is Product => product !== null);
+
+    if (validatedProducts.length === 0) {
+      throw new Error('No valid products found in Firestore');
+    }
+
+    return validatedProducts;
+  }
+
+  // New function to verify product data structure
+  function verifyProductStructure(productData: any) {
+    if (
+      !productData ||
+      !productData.results ||
+      !Array.isArray(productData.results) ||
+      productData.results.length === 0
+    ) {
+      console.warn(
+        'No products or invalid data structure from Firestore:',
+        productData
+      );
+      throw new Error(
+        'No products found or invalid data structure in Firestore'
+      );
+    }
+    return productData;
+  }
+
+  // Fetch Firestore products with enhanced debugging and validation
   useEffect(() => {
-    console.log('Products fetching started');
-    const loadProducts = async () => {
-      setIsProductsLoading(true);
-      try {
-        const productData = await fetchAllProducts();
-        console.log('Products fetched:', productData);
-        setProducts(productData.results || []); // Ensure results is an array, default to empty if undefined
-      } catch (error) {
-        console.error('Failed to fetch products:', error);
-        setProducts([
-          {
-            itemName: 'Slim Fit Shirt',
-            Price: 29.99,
-            Color: 'Red',
-            ItemSize: 'M',
-          },
-        ]); // Fallback mock data
-      } finally {
-        setIsProductsLoading(false);
-        console.log('Products state:', products);
-      }
-    };
+    // const unsubscribe = auth.onAuthStateChanged(async (user) => {
+    //   console.log(
+    //     'Auth state changed, user:',
+    //     user ? 'Authenticated' : 'Not authenticated'
+    //   );
+    //   if (!user) {
+    //     console.warn('User not authenticated, restricting product access');
+    //     setProducts([]);
+    //     setIsProductsLoading(false);
+    //   } else {
+    //     await loadProducts();
+    //   }
+    // });
+    // return () => unsubscribe();
     loadProducts();
   }, []);
+
+  const loadProducts = async () => {
+    setIsProductsLoading(true);
+    try {
+      const productData = await fetchAllProducts();
+      const verifiedData = verifyProductStructure(productData);
+      const validatedProducts = validateProducts(verifiedData.results);
+      setProducts(validatedProducts);
+    } catch (error) {
+      console.error('Failed to fetch products from Firestore:', error);
+      setProducts([
+        {
+          itemName: 'Slim Fit Shirt',
+          price: 29.99,
+          color: 'Red',
+          itemSize: 'S',
+        },
+      ]);
+    } finally {
+      setIsProductsLoading(false);
+    }
+  };
 
   // Show initial welcome message when chatbox is expanded
   useEffect(() => {
@@ -58,12 +150,13 @@ export default function Chatbox() {
         text: 'Hello! I’m LTRQ AI, your personal shopping assistant. I can help you find stylish clothes, recover your cart, track orders, or answer questions. What can I assist you with today?',
         isUser: false,
         timestamp: new Date(),
+        date: new Date(), // Added date field
       };
       setMessages([welcomeMessage]);
     }
     // Reset pop-up visibility when chatbox is closed
     if (!isExpanded) {
-      setShowPopup(true); // Show popup when chatbox is closed
+      setShowPopup(true);
     }
   }, [isExpanded, messages.length]);
 
@@ -79,43 +172,29 @@ export default function Chatbox() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Determine which prompt to use based on input
+  // Determine which prompt to use based on keyword arrays, with validation
   const getPrompt = (userInput: string) => {
     if (!userInput.trim())
       return LTRQ_AIBotProductRecommendationPrompt(products);
     const lowerInput = userInput.toLowerCase();
-    if (
-      lowerInput.includes('order') ||
-      lowerInput.includes('status') ||
-      lowerInput.includes('track')
-    ) {
+    const words = lowerInput.split(/\s+/);
+
+    if (!products || products.length === 0) {
+      return LTRQ_AIBotProductRecommendationPrompt([]);
+    }
+
+    if (words.some((word) => orderKeywords.includes(word))) {
       return LTRQ_AIBotOrderSupportPrompt(products, userInput);
-    } else if (
-      lowerInput.includes('cart') ||
-      lowerInput.includes('abandon') ||
-      lowerInput.includes('buy')
-    ) {
+    } else if (words.some((word) => cartKeywords.includes(word))) {
       return LTRQ_AIBotCartRecoveryPrompt(products, userInput);
-    } else if (
-      lowerInput.includes('help') ||
-      lowerInput.includes('support') ||
-      lowerInput.includes('return')
-    ) {
+    } else if (words.some((word) => supportKeywords.includes(word))) {
       return LTRQ_AIBotSupportPrompt(products, userInput);
-    } else if (
-      lowerInput.includes('recommend') ||
-      lowerInput.includes('looking') ||
-      lowerInput.includes('need')
-    ) {
+    } else if (words.some((word) => recommendationKeywords.includes(word))) {
       return LTRQ_AIBotProductRecommendationPrompt(products, userInput);
-    } else if (
-      lowerInput.includes('name') ||
-      lowerInput.includes('email') ||
-      lowerInput.includes('lead')
-    ) {
+    } else if (words.some((word) => leadKeywords.includes(word))) {
       return LTRQ_AIBotLeadGenPrompt(products, userInput);
     }
-    return LTRQ_AIBotProductRecommendationPrompt(products, userInput); // Default to product recommendations
+    return LTRQ_AIBotProductRecommendationPrompt(products, userInput);
   };
 
   // Handle sending a message to OpenAI with full conversation history
@@ -123,7 +202,12 @@ export default function Chatbox() {
     e.preventDefault();
     if (!input.trim()) return;
 
-    const userMessage = { text: input, isUser: true, timestamp: new Date() };
+    const userMessage = {
+      text: input,
+      isUser: true,
+      timestamp: new Date(),
+      date: new Date(), // Added date field
+    };
     setMessages((prev) => [...prev, userMessage]);
     setInput('');
     setIsLoading(true);
@@ -136,6 +220,7 @@ export default function Chatbox() {
             text: 'Sorry, I can’t recommend products right now. Please try again later.',
             isUser: false,
             timestamp: new Date(),
+            date: new Date(),
           },
         ]);
         setIsLoading(false);
@@ -148,7 +233,6 @@ export default function Chatbox() {
         );
       }
 
-      // Convert messages to OpenAI format, including full history
       const conversationHistory = messages.map((msg) => ({
         role: msg.isUser ? 'user' : 'assistant',
         content: msg.text,
@@ -180,17 +264,18 @@ export default function Chatbox() {
           text: data.choices[0].message.content,
           isUser: false,
           timestamp: new Date(),
+          date: new Date(),
         },
       ]);
       setIsLoading(false);
     } catch (error) {
-      console.error('OpenAI API error:', error);
       setMessages((prev) => [
         ...prev,
         {
           text: 'Sorry, something went wrong.',
           isUser: false,
           timestamp: new Date(),
+          date: new Date(),
         },
       ]);
       setIsLoading(false);
@@ -267,6 +352,8 @@ export default function Chatbox() {
                         minute: '2-digit',
                         second: '2-digit',
                       })}
+                      {msg.date && ` | Date: ${msg.date.toLocaleDateString()}`}{' '}
+                      {/* Display date if present */}
                     </span>
                   </div>
                 </div>

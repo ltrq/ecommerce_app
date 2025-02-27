@@ -10,7 +10,7 @@ import {
 import React from 'react';
 import type { Route } from './+types/root';
 import { UserProvider } from './context/userContext';
-import Chatbox from './routes/chatbox'; // Update path as needed
+import Chatbox from './components/chatbox';
 
 import './app.css';
 
@@ -46,12 +46,12 @@ export function Layout({ children }: { children: React.ReactNode }) {
 }
 
 export default function App() {
-  console.log('Hydration check:', typeof document !== 'undefined');
+  console.log('Root Hydration check:', typeof document !== 'undefined');
 
   return (
     <UserProvider>
       <Outlet />
-      <Chatbox /> {/* Add chatbox here */}
+      <Chatbox />
     </UserProvider>
   );
 }

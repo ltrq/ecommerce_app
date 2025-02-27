@@ -1,15 +1,35 @@
+// app/routes/ProductView.tsx
 import { useLoaderData } from 'react-router';
 import { useState } from 'react';
-import { fetchAllProducts } from '../utils/baserow';
+import { fetchAllProducts } from '../utils/firebase-utilsFunc'; // Will be updated to Firestore
+import { auth } from '../utils/firebase'; // Adjust the import path
 
+// Define product interface based on Firestore structure
 interface Product {
-  id: number;
+  imgURL1?: string; // Optional, as not all products have all image URLs
+  imgURL2?: string;
+  imgURL3?: string;
   itemName: string;
+  stockQuantity: number;
   price: number;
-  description: string;
-  itemSize: string;
+  averageRating: string | number; // Can be string or number based on your data
+  material: string;
+  itemID: number;
+  subCategoryID: string;
   color: string;
-  image?: string;
+  saleStartDate?: any; // Timestamp or null/undefined
+  updatedAt?: any; // Timestamp or empty string
+  dimension: string;
+  status: string;
+  reviewCount: string | number; // Can be string or number
+  saleEndDate?: any; // Timestamp or empty string
+  createdAt?: any; // Timestamp or empty string
+  discount: number;
+  categoryID: string;
+  isOnSale: boolean;
+  itemSize: string;
+  description: string;
+  SKU: string;
 }
 
 interface ProductGroup {
@@ -21,17 +41,33 @@ interface ProductGroup {
 
 type LoaderData = ProductGroup | { productId: string };
 
-function transformBaserowProductGroup(
-  products: Record<string, any>[]
-): ProductGroup {
+// app/routes/ProductView.tsx (partial, updated transformFirestoreProductGroup)
+function transformFirestoreProductGroup(products: Product[]): ProductGroup {
   const variants = products.map((raw) => ({
-    id: raw.id,
+    imgURL1: raw.imgURL1,
+    imgURL2: raw.imgURL2,
+    imgURL3: raw.imgURL3, // Include all image URLs
     itemName: raw.itemName || 'Unknown Item',
-    price: parseFloat(raw.Price) || 0,
-    description: raw.Description || 'No description',
-    itemSize: raw.ItemSize || 'N/A',
-    color: raw.Color || 'N/A',
-    image: raw.ImageURL1,
+    price: raw.price || 0, // Use 'price' instead of 'Price' to match Firestore
+    averageRating: raw.averageRating || 'N/A',
+    material: raw.material || 'N/A',
+    itemID: raw.itemID || 0,
+    subCategoryID: raw.subCategoryID || 'N/A',
+    color: raw.color || 'N/A',
+    saleStartDate: raw.saleStartDate,
+    updatedAt: raw.updatedAt,
+    dimension: raw.dimension || 'N/A',
+    status: raw.status || 'N/A',
+    reviewCount: raw.reviewCount || 'N/A',
+    saleEndDate: raw.saleEndDate,
+    createdAt: raw.createdAt,
+    discount: raw.discount || 0,
+    categoryID: raw.categoryID || 'N/A',
+    isOnSale: raw.isOnSale || false,
+    itemSize: raw.itemSize || 'N/A',
+    description: raw.description || 'No description',
+    SKU: raw.SKU || 'N/A',
+    stockQuantity: raw.stockQuantity || 0, // Add stockQuantity to match the Product interface
   }));
   return {
     itemName: variants[0]?.itemName || 'Unknown Item',
@@ -46,18 +82,16 @@ function filterAndTransformProducts(data: any, productId: string): LoaderData {
     return { productId: 'No items available' };
   }
 
-  const matchingProducts = data.results.filter(
-    (product: Record<string, any>) => {
-      const name = product.itemName;
-      return (
-        typeof name === 'string' &&
-        name.toLowerCase().replace(/\s+/g, '-') === productId.toLowerCase()
-      );
-    }
-  );
+  const matchingProducts = data.results.filter((product: Product) => {
+    const name = product.itemName;
+    return (
+      typeof name === 'string' &&
+      name.toLowerCase().replace(/\s+/g, '-') === productId.toLowerCase()
+    );
+  });
 
   return matchingProducts.length > 0
-    ? transformBaserowProductGroup(matchingProducts)
+    ? transformFirestoreProductGroup(matchingProducts)
     : { productId: 'Item not found' };
 }
 
@@ -190,11 +224,18 @@ export default function ProductView() {
         {currentVariant && (
           <div className="flex flex-col gap-2 text-xl">
             <p>Price: ${currentVariant.price.toFixed(2)}</p>
-            {currentVariant.image && (
+            {currentVariant.imgURL1 && ( // Use imgURL1 as the primary image, falling back to others if needed
               <img
-                src={currentVariant.image}
+                src={currentVariant.imgURL1}
                 alt={currentVariant.itemName}
                 className="max-w-xs"
+                onError={(e) => {
+                  if (currentVariant.imgURL2) {
+                    (e.target as HTMLImageElement).src = currentVariant.imgURL2;
+                  } else if (currentVariant.imgURL3) {
+                    (e.target as HTMLImageElement).src = currentVariant.imgURL3;
+                  }
+                }}
               />
             )}
           </div>

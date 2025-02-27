@@ -1,4 +1,4 @@
-import UnderConstruction from './UnderConstruction.jsx';
+import UnderConstruction from '../components/UnderConstruction.js';
 // import type { Route } from './+types/home';
 
 import {
@@ -13,6 +13,7 @@ import { Label } from '../../@/components/ui/label';
 
 import dotenv from 'dotenv';
 import { env } from 'process';
+import { ImportProducts } from '../utils/ImportProducts.js';
 
 // export function meta({}: Route.MetaArgs) {
 //   return [
@@ -43,6 +44,8 @@ export default function Test() {
       </Card> */}
       {/* {import.meta.env.REACT_APP_BASEROW_API_URL}
       {import.meta.env.REACT_APP_BASEROW_API_TOKEN} */}
+      {/* <ImportProducts /> */}
+      <div>hello</div>
     </>
   );
 }

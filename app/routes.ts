@@ -12,6 +12,7 @@ export default [
     route('sign-up', 'routes/sign-up.tsx'),
     route('product/:id', 'routes/product.tsx'),
     route('test', 'routes/test.tsx'),
+    route('admin', 'routes/AdminPanel.tsx'),
     route('*', 'routes/e404.tsx'),
     layout('routes/Footer.tsx', [
       index('routes/home.tsx'),
