@@ -1,29 +1,27 @@
-// app/routes/ProductView.tsx
+import { useState, useEffect } from 'react';
 import { useLoaderData } from 'react-router';
-import { useState } from 'react';
-import { fetchAllProducts } from '../utils/firebase-utilsFunc'; // Will be updated to Firestore
-import { auth } from '../utils/firebase'; // Adjust the import path
+import { useProducts } from '../context/productContext';
 
 // Define product interface based on Firestore structure
 interface Product {
-  imgURL1?: string; // Optional, as not all products have all image URLs
+  imgURL1?: string;
   imgURL2?: string;
   imgURL3?: string;
   itemName: string;
   stockQuantity: number;
   price: number;
-  averageRating: string | number; // Can be string or number based on your data
+  averageRating: string | number;
   material: string;
   itemID: number;
   subCategoryID: string;
   color: string;
-  saleStartDate?: any; // Timestamp or null/undefined
-  updatedAt?: any; // Timestamp or empty string
+  saleStartDate?: any;
+  updatedAt?: any;
   dimension: string;
   status: string;
-  reviewCount: string | number; // Can be string or number
-  saleEndDate?: any; // Timestamp or empty string
-  createdAt?: any; // Timestamp or empty string
+  reviewCount: string | number;
+  saleEndDate?: any;
+  createdAt?: any;
   discount: number;
   categoryID: string;
   isOnSale: boolean;
@@ -39,16 +37,15 @@ interface ProductGroup {
   colors: string[];
 }
 
-type LoaderData = ProductGroup | { productId: string };
+type LoaderData = { productId: string };
 
-// app/routes/ProductView.tsx (partial, updated transformFirestoreProductGroup)
 function transformFirestoreProductGroup(products: Product[]): ProductGroup {
   const variants = products.map((raw) => ({
     imgURL1: raw.imgURL1,
     imgURL2: raw.imgURL2,
-    imgURL3: raw.imgURL3, // Include all image URLs
+    imgURL3: raw.imgURL3,
     itemName: raw.itemName || 'Unknown Item',
-    price: raw.price || 0, // Use 'price' instead of 'Price' to match Firestore
+    price: raw.price || 0,
     averageRating: raw.averageRating || 'N/A',
     material: raw.material || 'N/A',
     itemID: raw.itemID || 0,
@@ -67,7 +64,7 @@ function transformFirestoreProductGroup(products: Product[]): ProductGroup {
     itemSize: raw.itemSize || 'N/A',
     description: raw.description || 'No description',
     SKU: raw.SKU || 'N/A',
-    stockQuantity: raw.stockQuantity || 0, // Add stockQuantity to match the Product interface
+    stockQuantity: raw.stockQuantity || 0,
   }));
   return {
     itemName: variants[0]?.itemName || 'Unknown Item',
@@ -77,12 +74,15 @@ function transformFirestoreProductGroup(products: Product[]): ProductGroup {
   };
 }
 
-function filterAndTransformProducts(data: any, productId: string): LoaderData {
-  if (!data.results?.length) {
+function filterAndTransformProducts(
+  products: Product[],
+  productId: string
+): ProductGroup | { productId: string } {
+  if (!products?.length) {
     return { productId: 'No items available' };
   }
 
-  const matchingProducts = data.results.filter((product: Product) => {
+  const matchingProducts = products.filter((product: Product) => {
     const name = product.itemName;
     return (
       typeof name === 'string' &&
@@ -95,12 +95,16 @@ function filterAndTransformProducts(data: any, productId: string): LoaderData {
     : { productId: 'Item not found' };
 }
 
-// New function to handle variant options
+// Handle variant options
 function getVariantOptions(
   variants: Product[],
   selectedSize: string | null,
   selectedColor: string | null
 ) {
+  if (!variants || !Array.isArray(variants)) {
+    return { validColors: [], validSizes: [], currentVariant: null };
+  }
+
   const validColors = selectedSize
     ? [
         ...new Set(
@@ -131,7 +135,7 @@ function getVariantOptions(
   return { validColors, validSizes, currentVariant };
 }
 
-export function meta({ data }: { data: LoaderData }) {
+export function meta({ data }: { data: any }) {
   const title = 'itemName' in data ? data.itemName : 'E-commerce Shop';
   const desc =
     'itemName' in data
@@ -140,31 +144,68 @@ export function meta({ data }: { data: LoaderData }) {
   return [{ title }, { name: 'description', content: desc }];
 }
 
+// Update loader to only handle params
 export async function loader({ params }: { params: { id: string } }) {
-  const productId = params.id;
-  const data = await fetchAllProducts();
-  return filterAndTransformProducts(data, productId);
+  return { productId: params.id };
 }
 
 export default function ProductView() {
-  const data = useLoaderData() as LoaderData;
+  const { productId } = useLoaderData() as LoaderData;
+  const { products, isLoading, error } = useProducts();
+  const [product, setProduct] = useState<ProductGroup | { productId: string }>({
+    productId: 'Loading...',
+  });
+  const [selectedSize, setSelectedSize] = useState<string | null>(null);
+  const [selectedColor, setSelectedColor] = useState<string | null>(null);
 
-  if ('productId' in data && !('itemName' in data)) {
+  // Filter products based on productId when products are loaded
+  useEffect(() => {
+    if (!isLoading && !error && products.length > 0) {
+      const filteredProduct = filterAndTransformProducts(products, productId);
+      setProduct(filteredProduct);
+    } else if (error) {
+      setProduct({ productId: error });
+    }
+  }, [products, productId, isLoading, error]);
+
+  if (isLoading) {
     return (
       <div className="flex flex-col items-center justify-center h-[100dvh] bg-background text-center">
         <div className="flex flex-col items-center gap-4 text-6xl">
-          {data.productId}
+          'Loading...'
         </div>
       </div>
     );
   }
 
-  const product = data as ProductGroup;
-  const [selectedSize, setSelectedSize] = useState<string | null>(null);
-  const [selectedColor, setSelectedColor] = useState<string | null>(null);
+  if ('productId' in product && product.productId !== 'Loading...') {
+    return (
+      <div className="flex flex-col items-center justify-center h-[100dvh] bg-background text-center">
+        <div className="flex flex-col items-center gap-4 text-6xl">
+          {product.productId}
+        </div>
+      </div>
+    );
+  }
 
+  // Type guard to ensure productGroup.variants exists and isn’t empty
+  if (
+    !('variants' in product) ||
+    !product.variants ||
+    product.variants.length === 0
+  ) {
+    return (
+      <div className="flex flex-col items-center justify-center h-[100dvh] bg-background text-center">
+        <div className="flex flex-col items-center gap-4 text-6xl">
+          'No variants available for this product'
+        </div>
+      </div>
+    );
+  }
+
+  const productGroup = product as ProductGroup;
   const { validColors, validSizes, currentVariant } = getVariantOptions(
-    product.variants,
+    productGroup.variants,
     selectedSize,
     selectedColor
   );
@@ -172,13 +213,13 @@ export default function ProductView() {
   return (
     <div className="flex flex-col items-center justify-center h-[100dvh] bg-background text-center">
       <div className="flex flex-col items-center gap-6">
-        <h1 className="text-6xl font-bold">{product.itemName}</h1>
+        <h1 className="text-6xl font-bold">{productGroup.itemName}</h1>
         <p className="text-2xl">
-          {product.variants[0]?.description || 'No description'}
+          {productGroup.variants[0]?.description || 'No description'}
         </p>
 
         <div className="flex gap-2">
-          {product.sizes.map((size) => (
+          {productGroup.sizes.map((size) => (
             <button
               key={size}
               className={`px-4 py-2 rounded ${
@@ -199,7 +240,7 @@ export default function ProductView() {
         </div>
 
         <div className="flex gap-2">
-          {product.colors.map((color) => (
+          {productGroup.colors.map((color) => (
             <button
               key={color}
               className={`px-4 py-2 rounded ${
@@ -224,7 +265,7 @@ export default function ProductView() {
         {currentVariant && (
           <div className="flex flex-col gap-2 text-xl">
             <p>Price: ${currentVariant.price.toFixed(2)}</p>
-            {currentVariant.imgURL1 && ( // Use imgURL1 as the primary image, falling back to others if needed
+            {currentVariant.imgURL1 && (
               <img
                 src={currentVariant.imgURL1}
                 alt={currentVariant.itemName}

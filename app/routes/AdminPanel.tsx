@@ -1,15 +1,15 @@
 // app/components/AdminPanel.tsx
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom'; // Import navigate for redirection
-import {
-  addProduct,
-  updateProduct,
-  fetchAllProducts,
-} from '../utils/firebase-utilsFunc'; // Adjust the import path
-import { type Product } from '../utils/firebase-utilsFunc'; // Import the Product interface
-import { auth } from '../utils/firebase'; // Import auth for authentication check
+import { useNavigate } from 'react-router-dom';
+import { useProducts } from '../context/productContext'; // Use ProductContext for products, UserContext for auth
+import { useUser } from '../context/userContext';
+import { addProduct, updateProduct } from '../utils/firebase-utilsFunc'; // Only import write functions
+import { type Product } from '../context/productContext'; // Import Product interface from ProductContext
 
 export default function AdminPanel() {
+  const { products, isLoading, error, refreshProducts } = useProducts(); // Access products from ProductContext
+  const user = useUser(); // Check authentication for writes
+  const navigate = useNavigate();
   const [newProduct, setNewProduct] = useState<Partial<Product>>({
     itemName: '',
     stockQuantity: 0,
@@ -38,35 +38,15 @@ export default function AdminPanel() {
   });
   const [productId, setProductId] = useState<string>('');
   const [updates, setUpdates] = useState<Partial<Product>>({});
-  const [products, setProducts] = useState<Product[]>([]);
   const [message, setMessage] = useState<string>('');
-  const [isLoading, setIsLoading] = useState<boolean>(false);
-  const navigate = useNavigate(); // Initialize navigate for redirection
 
-  // Check authentication state on mount
+  // Redirect to home if not authenticated on mount
   useEffect(() => {
-    const unsubscribe = auth.onAuthStateChanged((user) => {
-      if (!user) {
-        console.warn('User not authenticated, redirecting to home');
-        navigate('/'); // Redirect to home page if not authenticated
-      }
-    });
-    return () => unsubscribe(); // Cleanup subscription
-  }, [navigate]);
-
-  // Fetch existing products on component mount
-  React.useEffect(() => {
-    const loadProducts = async () => {
-      try {
-        const productData = await fetchAllProducts();
-        setProducts(productData.results as Product[]);
-      } catch (error) {
-        console.error('Failed to load products:', error);
-        setMessage('Failed to load products.');
-      }
-    };
-    loadProducts();
-  }, []);
+    if (!user) {
+      console.warn('User not authenticated, redirecting to home');
+      navigate('/');
+    }
+  }, [user, navigate]);
 
   // Handle input changes for new product
   const handleInputChange = (
@@ -95,8 +75,12 @@ export default function AdminPanel() {
   // Handle adding a new product
   const handleAddProduct = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
     setMessage('');
+
+    if (!user) {
+      setMessage('Please log in to add products.');
+      return;
+    }
 
     try {
       const requiredFields: (keyof Product)[] = [
@@ -166,23 +150,26 @@ export default function AdminPanel() {
         imgURL2: '',
         imgURL3: '',
       }); // Reset form
-      const updatedProducts = await fetchAllProducts();
-      setProducts(updatedProducts.results as Product[]);
+      refreshProducts(); // Update ProductContext with new products
     } catch (error) {
       console.error('Add product failed:', error);
-      if (error instanceof Error) {
-        setMessage(`Error adding product: ${error.message}`);
-      }
-    } finally {
-      setIsLoading(false);
+      setMessage(
+        `Error adding product: ${
+          error instanceof Error ? error.message : 'Unknown error'
+        }`
+      );
     }
   };
 
   // Handle updating an existing product
   const handleUpdateProduct = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
     setMessage('');
+
+    if (!user) {
+      setMessage('Please log in to update products.');
+      return;
+    }
 
     try {
       if (!productId) {
@@ -198,83 +185,110 @@ export default function AdminPanel() {
       setMessage(`Product ${productId} updated successfully`);
       setProductId('');
       setUpdates({});
-      const updatedProducts = await fetchAllProducts();
-      setProducts(updatedProducts.results as Product[]);
+      refreshProducts(); // Update ProductContext with updated products
     } catch (error) {
       console.error('Update product failed:', error);
-      if (error instanceof Error) {
-        setMessage(`Error updating product: ${error.message}`);
-      }
-    } finally {
-      setIsLoading(false);
+      setMessage(
+        `Error updating product: ${
+          error instanceof Error ? error.message : 'Unknown error'
+        }`
+      );
     }
   };
 
+  if (isLoading) {
+    return (
+      <div className="flex justify-center items-center h-screen text-black">
+        Loading products...
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex justify-center items-center h-screen text-red-500">
+        Error loading products: {error}
+      </div>
+    );
+  }
+
   return (
-    <div className="p-4 max-w-2xl mx-auto bg-white shadow-lg rounded-lg  text-black">
-      <h2 className="text-2xl font-bold mb-4">Admin Panel - Manage Products</h2>
+    <div className="p-6 max-w-3xl mx-auto bg-gray-50 shadow-xl rounded-lg text-black">
+      <h2 className="text-3xl font-bold mb-6 text-gray-800">
+        Admin Panel - Manage Products
+      </h2>
 
       {/* Add Product Form */}
-      <div className="mb-6 p-4 border rounded">
-        <h3 className="text-xl font-semibold mb-2">Add New Product</h3>
-        {message && <p className="mb-2 text-red-500">{message}</p>}
+      <div className="mb-8 p-6 bg-white rounded-lg shadow-md">
+        <h3 className="text-2xl font-semibold mb-4 text-gray-700">
+          Add New Product
+        </h3>
+        {message && <p className="mb-4 text-red-500">{message}</p>}
         <form onSubmit={handleAddProduct} className="space-y-4">
-          <input
-            type="text"
-            name="itemName"
-            value={newProduct.itemName}
-            onChange={handleInputChange}
-            placeholder="Item Name *"
-            className="w-full p-2 border rounded"
-            required
-          />
-          <input
-            type="number"
-            name="price"
-            value={newProduct.price}
-            onChange={handleInputChange}
-            placeholder="Price *"
-            className="w-full p-2 border rounded"
-            required
-          />
-          <input
-            type="text"
-            name="color"
-            value={newProduct.color}
-            onChange={handleInputChange}
-            placeholder="Color *"
-            className="w-full p-2 border rounded"
-            required
-          />
-          <input
-            type="text"
-            name="itemSize"
-            value={newProduct.itemSize}
-            onChange={handleInputChange}
-            placeholder="Size *"
-            className="w-full p-2 border rounded"
-            required
-          />
-          <input
-            type="number"
-            name="stockQuantity"
-            value={newProduct.stockQuantity}
-            onChange={handleInputChange}
-            placeholder="Stock Quantity"
-            className="w-full p-2 border rounded"
-          />
-          <input
-            type="text"
-            name="description"
-            value={newProduct.description}
-            onChange={handleInputChange}
-            placeholder="Description"
-            className="w-full p-2 border rounded"
-          />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <input
+              type="text"
+              name="itemName"
+              value={newProduct.itemName}
+              onChange={handleInputChange}
+              placeholder="Item Name *"
+              className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              required
+              disabled={!user}
+            />
+            <input
+              type="number"
+              name="price"
+              value={newProduct.price}
+              onChange={handleInputChange}
+              placeholder="Price *"
+              className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              required
+              disabled={!user}
+            />
+            <input
+              type="text"
+              name="color"
+              value={newProduct.color}
+              onChange={handleInputChange}
+              placeholder="Color *"
+              className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              required
+              disabled={!user}
+            />
+            <input
+              type="text"
+              name="itemSize"
+              value={newProduct.itemSize}
+              onChange={handleInputChange}
+              placeholder="Size *"
+              className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              required
+              disabled={!user}
+            />
+            <input
+              type="number"
+              name="stockQuantity"
+              value={newProduct.stockQuantity}
+              onChange={handleInputChange}
+              placeholder="Stock Quantity"
+              className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              disabled={!user}
+            />
+            <input
+              type="text"
+              name="description"
+              value={newProduct.description}
+              onChange={handleInputChange}
+              placeholder="Description"
+              className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              disabled={!user}
+            />
+          </div>
           <button
             type="submit"
-            className="w-full bg-blue-500 text-white p-2 rounded hover:bg-blue-600 disabled:bg-gray-400"
-            disabled={isLoading}
+            className="w-full bg-blue-500 text-white py-3 rounded-lg hover:bg-blue-600 disabled:bg-gray-400 transition duration-300"
+            disabled={!user || isLoading}
           >
             {isLoading ? 'Adding...' : 'Add Product'}
           </button>
@@ -282,63 +296,74 @@ export default function AdminPanel() {
       </div>
 
       {/* Update Product Form */}
-      <div className="p-4 border rounded">
-        <h3 className="text-xl font-semibold mb-2">Update Existing Product</h3>
-        {message && <p className="mb-2 text-red-500">{message}</p>}
+      <div className="p-6 bg-white rounded-lg shadow-md">
+        <h3 className="text-2xl font-semibold mb-4 text-gray-700">
+          Update Existing Product
+        </h3>
+        {message && <p className="mb-4 text-red-500">{message}</p>}
         <form onSubmit={handleUpdateProduct} className="space-y-4">
           <input
             type="text"
             value={productId}
             onChange={(e) => setProductId(e.target.value)}
             placeholder="Product ID *"
-            className="w-full p-2 border rounded"
+            className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             required
+            disabled={!user}
           />
-          <input
-            type="number"
-            name="price"
-            value={updates.price || ''}
-            onChange={handleUpdateChange}
-            placeholder="New Price"
-            className="w-full p-2 border rounded"
-          />
-          <input
-            type="text"
-            name="color"
-            value={updates.color || ''}
-            onChange={handleUpdateChange}
-            placeholder="New Color"
-            className="w-full p-2 border rounded"
-          />
-          <input
-            type="text"
-            name="itemSize"
-            value={updates.itemSize || ''}
-            onChange={handleUpdateChange}
-            placeholder="New Size"
-            className="w-full p-2 border rounded"
-          />
-          <input
-            type="number"
-            name="stockQuantity"
-            value={updates.stockQuantity || ''}
-            onChange={handleUpdateChange}
-            placeholder="New Stock Quantity"
-            className="w-full p-2 border rounded"
-          />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <input
+              type="number"
+              name="price"
+              value={updates.price || ''}
+              onChange={handleUpdateChange}
+              placeholder="New Price"
+              className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              disabled={!user}
+            />
+            <input
+              type="text"
+              name="color"
+              value={updates.color || ''}
+              onChange={handleUpdateChange}
+              placeholder="New Color"
+              className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              disabled={!user}
+            />
+            <input
+              type="text"
+              name="itemSize"
+              value={updates.itemSize || ''}
+              onChange={handleUpdateChange}
+              placeholder="New Size"
+              className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              disabled={!user}
+            />
+            <input
+              type="number"
+              name="stockQuantity"
+              value={updates.stockQuantity || ''}
+              onChange={handleUpdateChange}
+              placeholder="New Stock Quantity"
+              className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              disabled={!user}
+            />
+          </div>
           <button
             type="submit"
-            className="w-full bg-green-500 text-white p-2 rounded hover:bg-green-600 disabled:bg-gray-400"
-            disabled={isLoading}
+            className="w-full bg-green-500 text-white py-3 rounded-lg hover:bg-green-600 disabled:bg-gray-400 transition duration-300"
+            disabled={!user || isLoading}
           >
             {isLoading ? 'Updating...' : 'Update Product'}
           </button>
         </form>
-        <div className="mt-4">
-          <h4 className="text-lg font-medium">Current Products</h4>
-          <ul className="list-disc pl-5">
+        <div className="mt-6">
+          <h4 className="text-xl font-medium mb-2 text-gray-700">
+            Current Products
+          </h4>
+          <ul className="list-disc pl-5 space-y-2">
             {products.map((product) => (
-              <li key={product.itemID} className="text-sm">
+              <li key={product.itemID} className="text-gray-600">
                 {product.itemName} (ID: {product.itemID}, Price: $
                 {product.price})
               </li>

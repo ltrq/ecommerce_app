@@ -10,6 +10,7 @@ import {
 import React from 'react';
 import type { Route } from './+types/root';
 import { UserProvider } from './context/userContext';
+import { ProductProvider } from './context/productContext';
 import Chatbox from './components/chatbox';
 
 import './app.css';
@@ -49,10 +50,12 @@ export default function App() {
   console.log('Root Hydration check:', typeof document !== 'undefined');
 
   return (
-    <UserProvider>
-      <Outlet />
-      <Chatbox />
-    </UserProvider>
+    <ProductProvider>
+      <UserProvider>
+        <Outlet />
+        <Chatbox />
+      </UserProvider>
+    </ProductProvider>
   );
 }
 

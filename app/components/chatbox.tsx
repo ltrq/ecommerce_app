@@ -1,6 +1,9 @@
 // app/components/Chatbox.tsx
 import { useState, useRef, useEffect } from 'react';
-import { useChatboxService } from '../utils/chatboxServices'; // New service import
+import { useChatboxService } from '../utils/chatboxServices'; // Corrected import path (singular)
+
+// Import the Message interface from chatboxService.ts
+import { type Message } from '../utils/chatboxServices';
 
 export default function Chatbox() {
   const {
@@ -16,6 +19,7 @@ export default function Chatbox() {
     setInput,
     setIsExpanded,
     setShowPopup,
+    setMessages, // Ensure setMessages is included in the destructuring
   } = useChatboxService();
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -36,15 +40,21 @@ export default function Chatbox() {
   // Show initial welcome message when chatbox is expanded
   useEffect(() => {
     if (isExpanded && messages.length === 0) {
-      handleChatToggle(); // This might trigger a welcome message in the service
+      const welcomeMessage: Message = {
+        text: 'Hello! I’m LTRQ AI, your personal shopping assistant. I can help you find stylish clothes, recover your cart, track orders, or answer questions. What can I assist you with today?',
+        isUser: false,
+        timestamp: new Date(),
+        date: new Date(),
+      };
+      setMessages([welcomeMessage]); // Use setMessages from the service
     }
     // Reset pop-up visibility when chatbox is closed
     if (!isExpanded) {
       setShowPopup(true);
     }
-  }, [isExpanded, messages.length, handleChatToggle, setShowPopup]);
+  }, [isExpanded, messages.length, setMessages, setShowPopup]);
 
-  // Handle form submission, passing the input value to handleSend
+  // Handle form submission
   const onSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     handleSend(input); // Pass the input value as a string
@@ -122,8 +132,6 @@ export default function Chatbox() {
           </div>
           <div className="p-2 border-t">
             <form onSubmit={onSubmit}>
-              {' '}
-              {/* Updated to use onSubmit function */}
               <div className="flex gap-2">
                 <input
                   type="text"
@@ -132,12 +140,12 @@ export default function Chatbox() {
                   onChange={(e) => setInput(e.target.value)}
                   placeholder="Type a message..."
                   className="flex-1 p-2 border rounded text-black"
-                  disabled={isLoading}
+                  disabled={isLoading || isProductsLoading}
                 />
                 <button
                   type="submit"
                   className="bg-blue-500 text-white p-2 rounded hover:bg-blue-600 disabled:bg-gray-400"
-                  disabled={isLoading}
+                  disabled={isLoading || isProductsLoading}
                 >
                   {isLoading ? 'Sending...' : 'Send'}
                 </button>
