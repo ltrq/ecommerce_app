@@ -11,6 +11,7 @@ import React from 'react';
 import type { Route } from './+types/root';
 import { UserProvider } from './context/userContext';
 import { ProductProvider } from './context/productContext';
+import { CartProvider } from './context/cartContext';
 import Chatbox from './components/chatbox';
 
 import './app.css';
@@ -51,10 +52,12 @@ export default function App() {
 
   return (
     <ProductProvider>
-      <UserProvider>
-        <Outlet />
-        <Chatbox />
-      </UserProvider>
+      <CartProvider>
+        <UserProvider>
+          <Outlet />
+          <Chatbox />
+        </UserProvider>
+      </CartProvider>
     </ProductProvider>
   );
 }

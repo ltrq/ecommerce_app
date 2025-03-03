@@ -20,7 +20,8 @@ export default function LogoutButton() {
 
   return (
     <button onClick={handleLogout}>
-      <UserRound color="black" />
+      {/* <UserRound color="black" /> */}
+      Log Me Out
     </button>
   );
 }

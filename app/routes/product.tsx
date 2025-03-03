@@ -1,6 +1,9 @@
+// app/routes/ProductView.tsx
 import { useState, useEffect } from 'react';
 import { useLoaderData } from 'react-router';
-import { useProducts } from '../context/productContext';
+import { useProducts } from '../context/productContext'; // Import useUser for auth
+import { useUser } from '../context/userContext';
+import { useCart } from '../context/cartContext'; // Import cart context
 
 // Define product interface based on Firestore structure
 interface Product {
@@ -152,6 +155,8 @@ export async function loader({ params }: { params: { id: string } }) {
 export default function ProductView() {
   const { productId } = useLoaderData() as LoaderData;
   const { products, isLoading, error } = useProducts();
+  const { addToCart, isLoading: cartLoading, error: cartError } = useCart(); // Use addToCart from state-based cartContext
+  const user = useUser(); // Check authentication for cart operations
   const [product, setProduct] = useState<ProductGroup | { productId: string }>({
     productId: 'Loading...',
   });
@@ -210,66 +215,105 @@ export default function ProductView() {
     selectedColor
   );
 
+  // Handle adding to cart
+  const handleAddToCart = async () => {
+    if (!user) {
+      alert('Please log in to add items to your cart.');
+      return;
+    }
+
+    if (!currentVariant) {
+      alert('Please select a size and color before adding to cart.');
+      return;
+    }
+
+    if (currentVariant.stockQuantity <= 0) {
+      alert('This item is out of stock.');
+      return;
+    }
+
+    try {
+      await addToCart(currentVariant, selectedSize!, selectedColor!, 1); // Default quantity of 1
+      alert(`${currentVariant.itemName} added to cart!`);
+    } catch (error) {
+      console.error('Failed to add to cart:', error);
+      alert(`Error adding to cart: ${cartError || 'Unknown error'}`);
+    }
+  };
+
   return (
     <div className="flex flex-col items-center justify-center h-[100dvh] bg-background text-center">
-      <div className="flex flex-col items-center gap-6">
-        <h1 className="text-6xl font-bold">{productGroup.itemName}</h1>
-        <p className="text-2xl">
+      <div className="flex flex-col items-center gap-6 max-w-2xl">
+        <h1 className="text-6xl font-bold text-gray-800">
+          {productGroup.itemName}
+        </h1>
+        <p className="text-2xl text-gray-600">
           {productGroup.variants[0]?.description || 'No description'}
         </p>
 
-        <div className="flex gap-2">
-          {productGroup.sizes.map((size) => (
-            <button
-              key={size}
-              className={`px-4 py-2 rounded ${
-                selectedSize === size ? 'bg-blue-500 text-white' : 'bg-gray-200'
-              } ${
-                !validSizes.includes(size)
-                  ? 'opacity-50 cursor-not-allowed'
-                  : ''
-              }`}
-              onClick={() =>
-                setSelectedSize(size === selectedSize ? null : size)
-              }
-              disabled={!validSizes.includes(size)}
-            >
-              {size}
-            </button>
-          ))}
-        </div>
+        <div className="flex flex-col md:flex-row gap-4">
+          <div className="flex gap-2 flex-wrap justify-center">
+            {productGroup.sizes.map((size) => (
+              <button
+                key={size}
+                className={`px-4 py-2 rounded-lg ${
+                  selectedSize === size
+                    ? 'bg-blue-500 text-white'
+                    : 'bg-gray-200 text-gray-800'
+                } ${
+                  !validSizes.includes(size)
+                    ? 'opacity-50 cursor-not-allowed'
+                    : 'hover:bg-gray-300'
+                }`}
+                onClick={() =>
+                  setSelectedSize(size === selectedSize ? null : size)
+                }
+                disabled={!validSizes.includes(size)}
+              >
+                {size}
+              </button>
+            ))}
+          </div>
 
-        <div className="flex gap-2">
-          {productGroup.colors.map((color) => (
-            <button
-              key={color}
-              className={`px-4 py-2 rounded ${
-                selectedColor === color
-                  ? 'bg-blue-500 text-white'
-                  : 'bg-gray-200'
-              } ${
-                !validColors.includes(color)
-                  ? 'opacity-50 cursor-not-allowed'
-                  : ''
-              }`}
-              onClick={() =>
-                setSelectedColor(color === selectedColor ? null : color)
-              }
-              disabled={!validColors.includes(color)}
-            >
-              {color}
-            </button>
-          ))}
+          <div className="flex gap-2 flex-wrap justify-center">
+            {productGroup.colors.map((color) => (
+              <button
+                key={color}
+                className={`px-4 py-2 rounded-lg ${
+                  selectedColor === color
+                    ? 'bg-blue-500 text-white'
+                    : 'bg-gray-200 text-gray-800'
+                } ${
+                  !validColors.includes(color)
+                    ? 'opacity-50 cursor-not-allowed'
+                    : 'hover:bg-gray-300'
+                }`}
+                onClick={() =>
+                  setSelectedColor(color === selectedColor ? null : color)
+                }
+                disabled={!validColors.includes(color)}
+              >
+                {color}
+              </button>
+            ))}
+          </div>
         </div>
 
         {currentVariant && (
-          <div className="flex flex-col gap-2 text-xl">
-            <p>Price: ${currentVariant.price.toFixed(2)}</p>
+          <div className="flex flex-col items-center gap-4 w-full">
+            <p className="text-2xl font-semibold text-gray-800">
+              Price: ${currentVariant.price.toFixed(2)}
+            </p>
+            {currentVariant.stockQuantity > 0 ? (
+              <p className="text-green-500 text-lg">In Stock</p>
+            ) : (
+              <p className="text-red-500 text-lg">Out of Stock</p>
+            )}
             {currentVariant.imgURL1 && (
               <img
                 src={currentVariant.imgURL1}
                 alt={currentVariant.itemName}
-                className="max-w-xs"
+                className="max-w-xs rounded-lg shadow-md"
                 onError={(e) => {
                   if (currentVariant.imgURL2) {
                     (e.target as HTMLImageElement).src = currentVariant.imgURL2;
@@ -279,8 +323,26 @@ export default function ProductView() {
                 }}
               />
             )}
+
+            {cartError && <p className="text-red-500 mt-2">{cartError}</p>}
           </div>
         )}
+        <button
+          onClick={handleAddToCart}
+          className={`mt-4 px-6 py-3 rounded-lg font-semibold transition duration-300 ${
+            !user || !currentVariant || currentVariant.stockQuantity <= 0
+              ? 'bg-gray-400 text-gray-600 cursor-not-allowed'
+              : 'bg-green-500 text-white hover:bg-green-600'
+          }`}
+          disabled={
+            !user ||
+            !currentVariant ||
+            currentVariant.stockQuantity <= 0 ||
+            cartLoading
+          }
+        >
+          {cartLoading ? 'Adding...' : 'Add to Cart'}
+        </button>
       </div>
     </div>
   );

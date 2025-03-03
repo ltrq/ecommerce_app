@@ -1,6 +1,7 @@
 // app/utils/chatboxService.ts
 import { useState, useEffect, useCallback } from 'react';
 import { useProducts } from '../context/productContext';
+import { useCart, type AIProduct } from '../context/cartContext';
 import {
   LTRQ_AIBotProductRecommendationPrompt,
   LTRQ_AIBotCartRecoveryPrompt,
@@ -52,42 +53,58 @@ export function useChatboxService() {
   const [isLoading, setIsLoading] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
   const [showPopup, setShowPopup] = useState(true);
+  const { getCartJson } = useCart();
 
   // Determine prompt based on input, using transformed products
   const getPrompt = (userInput: string): string => {
+    const cartJson = getCartJson(); // Get cart as JSON for prompts
     if (!userInput.trim())
       return LTRQ_AIBotProductRecommendationPrompt(
-        transformProducts(products || [])
+        transformProducts(products) as Product[],
+        cartJson,
+        userInput
       );
     const lowerInput = userInput.toLowerCase();
     const words = lowerInput.split(/\s+/);
 
     if (productsLoading || !products || products.length === 0) {
-      return LTRQ_AIBotProductRecommendationPrompt([]); // Fallback to empty products if loading or error
+      return LTRQ_AIBotProductRecommendationPrompt([], cartJson); // Fallback
     }
 
     if (words.some((word) => orderKeywords.includes(word))) {
       return LTRQ_AIBotOrderSupportPrompt(
-        transformProducts(products),
+        transformProducts(products) as AIProduct[],
+        cartJson,
         userInput
       );
     } else if (words.some((word) => cartKeywords.includes(word))) {
       return LTRQ_AIBotCartRecoveryPrompt(
-        transformProducts(products),
+        transformProducts(products) as AIProduct[],
+        cartJson,
         userInput
       );
     } else if (words.some((word) => supportKeywords.includes(word))) {
-      return LTRQ_AIBotSupportPrompt(transformProducts(products), userInput);
+      return LTRQ_AIBotSupportPrompt(
+        transformProducts(products) as AIProduct[],
+        cartJson,
+        userInput
+      );
     } else if (words.some((word) => recommendationKeywords.includes(word))) {
       return LTRQ_AIBotProductRecommendationPrompt(
-        transformProducts(products),
+        transformProducts(products) as AIProduct[],
+        cartJson,
         userInput
       );
     } else if (words.some((word) => leadKeywords.includes(word))) {
-      return LTRQ_AIBotLeadGenPrompt(transformProducts(products), userInput);
+      return LTRQ_AIBotLeadGenPrompt(
+        transformProducts(products) as AIProduct[],
+        cartJson,
+        userInput
+      );
     }
     return LTRQ_AIBotProductRecommendationPrompt(
-      transformProducts(products),
+      transformProducts(products) as AIProduct[],
+      cartJson,
       userInput
     );
   };

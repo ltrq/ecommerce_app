@@ -13,6 +13,9 @@ export default [
     route('product/:id', 'routes/product.tsx'),
     route('test', 'routes/test.tsx'),
     route('admin', 'routes/AdminPanel.tsx'),
+    route('user', 'routes/user.tsx'),
+
+    route('cart', 'routes/cart.tsx'),
     route('*', 'routes/e404.tsx'),
     layout('routes/Footer.tsx', [
       index('routes/home.tsx'),

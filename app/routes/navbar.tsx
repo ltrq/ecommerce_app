@@ -1,9 +1,11 @@
-import { Link, NavLink, Outlet } from 'react-router';
+// app/routes/Navbar.tsx
+import { Link, NavLink, Outlet } from 'react-router-dom';
 import { useUser } from '../context/userContext';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 // import EcommerceLogo from '../components/EcommerceLogo';
 import Logout from './log-out';
-import { Star, ShoppingBag, Search } from 'lucide-react';
+import { Star, ShoppingBag, Search, UserRound } from 'lucide-react';
+import { useCart } from '../context/cartContext'; // Import useCart for cart quantity
 
 function NavbarNotLoggedIn() {
   return (
@@ -49,6 +51,14 @@ function NavbarNotLoggedIn() {
 
 function NavbarLoggedIn() {
   const [isPagesOpen, setIsPagesOpen] = useState(false);
+  const { totalQuantity, isLoading: cartLoading } = useCart(); // Access totalQuantity from cartContext
+
+  // Handle cart loading state (optional, for robustness)
+  useEffect(() => {
+    if (cartLoading) {
+      console.log('Cart is loading...');
+    }
+  }, [cartLoading]);
 
   return (
     <nav className="bg-white shadow-md py-4 px-6 flex items-center justify-between">
@@ -113,12 +123,20 @@ function NavbarLoggedIn() {
         <Link to="/search">
           <Search color="black" />
         </Link>
-        <Logout />
+        {/* <Logout /> */}
+        <Link to="/user">
+          <UserRound color="black" />
+        </Link>
         <Link to="/favorites">
           <Star color="black" />
         </Link>
-        <Link to="/cart">
+        <Link to="/cart" className="relative">
           <ShoppingBag color="black" />
+          {totalQuantity > 0 && (
+            <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold w-5 h-5 flex items-center justify-center rounded-full">
+              {totalQuantity}
+            </span>
+          )}
         </Link>
       </div>
     </nav>
