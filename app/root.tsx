@@ -7,14 +7,28 @@ import {
   Scripts,
   ScrollRestoration,
 } from 'react-router';
-import React from 'react';
+import React, { Suspense, useEffect, useState } from 'react';
+import { lazy } from 'react';
 import type { Route } from './+types/root';
-import { UserProvider } from './context/userContext';
+import { UserProvider, useUser } from './context/userContext';
 import { ProductProvider } from './context/productContext';
 import { CartProvider } from './context/cartContext';
 import Chatbox from './components/chatbox';
 
 import './app.css';
+
+const Cart = lazy(() => import('./routes/cart'));
+const SignIn = lazy(() => import('./routes/sign-in'));
+const SignUp = lazy(() => import('./routes/sign-up'));
+const Product = lazy(() => import('./routes/product'));
+const User = lazy(() => import('./routes/user'));
+const Admin = lazy(() => import('./routes/AdminPanel'));
+const E404 = lazy(() => import('./routes/e404'));
+const Home = lazy(() => import('./routes/home'));
+const Deals = lazy(() => import('./routes/deals'));
+const NewArrivals = lazy(() => import('./routes/new-arrivals'));
+const Packages = lazy(() => import('./routes/packages'));
+const AIChatbox = lazy(() => import('./components/chatbox'));
 
 export const links: Route.LinksFunction = () => [
   { rel: 'preconnect', href: 'https://fonts.googleapis.com' },
@@ -47,18 +61,43 @@ export function Layout({ children }: { children: React.ReactNode }) {
   );
 }
 
-export default function App() {
-  console.log('Root Hydration check:', typeof document !== 'undefined');
+// Wrapper to handle loading state
+const AppContent: React.FC = () => {
+  const { loading } = useUser();
+
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center h-screen text-gray-600">
+        Loading user authentication...
+      </div>
+    );
+  }
 
   return (
     <ProductProvider>
       <CartProvider>
-        <UserProvider>
-          <Outlet />
-          <Chatbox />
-        </UserProvider>
+        <Outlet />
+        <Chatbox />
       </CartProvider>
     </ProductProvider>
+  );
+};
+
+export default function App() {
+  console.log('Root Hydration check:', typeof document !== 'undefined');
+
+  return (
+    <Suspense
+      fallback={
+        <div className="flex justify-center items-center h-screen text-gray-600">
+          Lazy Loading...
+        </div>
+      }
+    >
+      <UserProvider>
+        <AppContent />
+      </UserProvider>
+    </Suspense>
   );
 }
 

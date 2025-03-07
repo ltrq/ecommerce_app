@@ -7,7 +7,10 @@ import {
   useMemo,
   type ReactNode,
 } from 'react';
-import { type Product } from '../context/productContext'; // Match Product interface
+import axios from 'axios';
+import { type Product } from '../context/productContext';
+import { useUser } from '../context/userContext';
+import debounce from 'lodash/debounce';
 
 interface CartItem {
   product: Product;
@@ -16,7 +19,6 @@ interface CartItem {
   color: string;
 }
 
-// Simplified Product interface for AI prompts (matching AIchatbot-prompts.ts)
 interface AIProduct {
   itemName: string;
   Price: number;
@@ -39,15 +41,113 @@ interface CartContextValue {
   totalQuantity: number;
   isLoading: boolean;
   error: string | null;
-  getCartJson: () => string; // Function that returns a string, not a string itself
+  getCartJson: () => string;
+}
+
+interface CartUpdateRequest {
+  cart: CartItem[];
+  userId: string;
+  email: string;
+  timestamp: Date;
 }
 
 const CartContext = createContext<CartContextValue | undefined>(undefined);
+
+const BACKEND_API_URL = import.meta.env.VITE_BACKEND_API_SYNCCART_URL;
+const FETCH_CART_URL = import.meta.env.VITE_BACKEND_API_FETCHCART_URL;
+
+// Refactored getIdToken to accept user and email as parameters
+const getIdToken = async (user: any, email: string | null) => {
+  if (!user || !email) {
+    throw new Error('User not authenticated or email not available');
+  }
+  try {
+    const idToken = await user.getIdToken();
+    return idToken;
+  } catch (error) {
+    console.error('Error fetching ID token:', error);
+    throw new Error('Failed to get ID token');
+  }
+};
 
 export function CartProvider({ children }: { children: ReactNode }) {
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { user, email } = useUser(); // Use hooks at the top level
+
+  // Fetch cart from Firestore when user logs in
+  useEffect(() => {
+    const fetchCartFromFirestore = async () => {
+      if (!user || !email) {
+        console.log('No user logged in, clearing cart');
+        setCartItems([]); // Clear cart if no user is logged in
+        return;
+      }
+
+      try {
+        setIsLoading(true);
+        const token = await getIdToken(user, email);
+        const response = await axios.get(FETCH_CART_URL, {
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        const fetchedCart = response.data.cart || [];
+        setCartItems(fetchedCart);
+      } catch (err) {
+        setError(
+          axios.isAxiosError(err) && err.response
+            ? `Failed to fetch cart: ${err.response.data?.error || err.message}`
+            : 'Failed to fetch cart from backend'
+        );
+        console.error('Error fetching cart from backend:', err);
+        setCartItems([]); // Reset cart on error
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchCartFromFirestore();
+  }, [user, email]); // Run whenever user or email changes (i.e., on login/logout)
+
+  const sendCartUpdateToBackend = debounce(async (cartItems: CartItem[]) => {
+    if (!user || !email) {
+      console.log(
+        'User not authenticated or email not available, skipping backend cart update'
+      );
+      return;
+    }
+    try {
+      const token = await getIdToken(user, email);
+      const response = await axios.post(
+        BACKEND_API_URL,
+        {
+          cart: cartItems,
+          userId: user.uid,
+          email: email,
+          timestamp: new Date(),
+        } as CartUpdateRequest,
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+      setError(null); // Clear error on success
+      console.log('Cart update sent to backend:', response.data);
+    } catch (err) {
+      setError(
+        axios.isAxiosError(err) && err.response
+          ? `Backend error: ${err.response.data?.error || err.message}`
+          : 'Failed to update cart on backend'
+      );
+      console.error('Error sending cart update to backend:', err);
+    }
+  }, 500);
 
   const addToCart = async (
     product: Product,
@@ -69,15 +169,19 @@ export function CartProvider({ children }: { children: ReactNode }) {
             item.color === color
         );
         if (existingItem) {
-          return prev.map((item) =>
+          const updatedItems = prev.map((item) =>
             item.product.itemID === product.itemID &&
             item.size === size &&
             item.color === color
               ? { ...item, quantity: item.quantity + quantity }
               : item
           );
+          sendCartUpdateToBackend(updatedItems);
+          return updatedItems;
         }
-        return [...prev, { product, quantity, size, color }];
+        const newItems = [...prev, { product, quantity, size, color }];
+        sendCartUpdateToBackend(newItems);
+        return newItems;
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to add to cart');
@@ -87,16 +191,18 @@ export function CartProvider({ children }: { children: ReactNode }) {
   };
 
   const removeItem = (product: Product, size: string, color: string) => {
-    setCartItems((prev) =>
-      prev.filter(
+    setCartItems((prev) => {
+      const updatedItems = prev.filter(
         (item) =>
           !(
             item.product.itemID === product.itemID &&
             item.size === size &&
             item.color === color
           )
-      )
-    );
+      );
+      sendCartUpdateToBackend(updatedItems);
+      return updatedItems;
+    });
   };
 
   const increaseQuantity = (product: Product, size: string, color: string) => {
@@ -126,37 +232,45 @@ export function CartProvider({ children }: { children: ReactNode }) {
   };
 
   const clearCart = () => {
-    setCartItems([]);
+    setCartItems((prev) => {
+      const updatedItems: CartItem[] = [];
+      sendCartUpdateToBackend(updatedItems);
+      return updatedItems;
+    });
   };
 
-  // Transform CartItem to match AIchatbot-prompts.ts Product interface (capitalized fields)
   const transformCartItemToProduct = (cartItem: CartItem): AIProduct => ({
     itemName: cartItem.product.itemName,
     Price: cartItem.product.price,
     Color: cartItem.product.color,
-    ItemSize: cartItem.size, // Use size from CartItem, not product.itemSize (since CartItem.size may differ)
+    ItemSize: cartItem.size,
   });
 
-  // Get cart as JSON for AI prompts, including quantity for context
   const getCartJson = useMemo(() => {
     const cartProducts = cartItems.map((item) => ({
       ...transformCartItemToProduct(item),
-      Quantity: item.quantity, // Add quantity for AI context
+      Quantity: item.quantity,
     }));
-    return () => JSON.stringify(cartProducts); // Return a function that returns the string
+    return () => JSON.stringify(cartProducts);
   }, [cartItems]);
 
-  // Persist cart to localStorage
-  useEffect(() => {
-    const savedCart = localStorage.getItem('cart');
-    if (savedCart) {
-      const parsedCart = JSON.parse(savedCart) as CartItem[];
-      setCartItems(parsedCart);
-    }
-  }, []);
+  // Removed localStorage logic
+  // useEffect(() => {
+  //   const savedCart = localStorage.getItem('cart');
+  //   if (savedCart) {
+  //     const parsedCart = JSON.parse(savedCart) as CartItem[];
+  //     setCartItems(parsedCart);
+  //   }
+  // }, []);
 
+  // useEffect(() => {
+  //   localStorage.setItem('cart', JSON.stringify(cartItems));
+  //   sendCartUpdateToBackend(cartItems);
+  // }, [cartItems]);
+
+  // Only send updates to backend when cartItems change
   useEffect(() => {
-    localStorage.setItem('cart', JSON.stringify(cartItems));
+    sendCartUpdateToBackend(cartItems);
   }, [cartItems]);
 
   const value = {
@@ -169,7 +283,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     totalQuantity: cartItems.reduce((sum, item) => sum + item.quantity, 0),
     isLoading,
     error,
-    getCartJson, // Pass the function, not the string
+    getCartJson,
   };
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
@@ -183,4 +297,4 @@ export function useCart() {
   return context;
 }
 
-export type { CartItem, AIProduct }; // Export CartItem and AIProduct for type safety in other files
+export type { CartItem, AIProduct, CartUpdateRequest };
